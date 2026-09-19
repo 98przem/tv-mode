@@ -342,8 +342,9 @@ class ChromeKeyboard:
                     self.click_point(websocket, x, y)
                     return
                 if value == 'PlayerBack':
-                    if not self.click_element(websocket, '[data-uia="nfplayer-exit"]'):
-                        self.command(websocket, 'Page.goBack')
+                    self.command(websocket, 'Page.navigate', {
+                        'url': 'https://www.netflix.com/browse',
+                    })
                     return
                 if value is not True and not isinstance(value, str):
                     self.install_script_on_connection(websocket, self.netflix_source)
@@ -364,8 +365,9 @@ class ChromeKeyboard:
                         self.click_point(websocket, x, y)
                         return
                     if value == 'PlayerBack':
-                        if not self.click_element(websocket, '[data-uia="nfplayer-exit"]'):
-                            self.command(websocket, 'Page.goBack')
+                        self.command(websocket, 'Page.navigate', {
+                            'url': 'https://www.netflix.com/browse',
+                        })
                         return
                 if isinstance(value, str):
                     key, code, virtual_key = self.KEYS[value]
@@ -722,7 +724,10 @@ window.tv-window {
             self.launch()
             return True
         if name in ('Left', 'Right'):
-            self.move_selection(-1 if name == 'Left' else 1)
+            self.move_horizontal(-1 if name == 'Left' else 1)
+            return True
+        if name in ('Up', 'Down'):
+            self.move_grid(-1 if name == 'Up' else 1)
             return True
         if name == 'Escape':
             self.quit()
@@ -797,9 +802,13 @@ window.tv-window {
         if 'a' in new:
             self.launch()
         elif 'left' in new:
-            self.move_selection(-1)
+            self.move_horizontal(-1)
         elif 'right' in new:
-            self.move_selection(1)
+            self.move_horizontal(1)
+        elif 'up' in new:
+            self.move_grid(-1)
+        elif 'down' in new:
+            self.move_grid(1)
         elif 'b' in new:
             log('B: zamknięto TV mode')
             self.quit()
@@ -812,6 +821,32 @@ window.tv-window {
         self.hint.set_label('')
         self.update_selection()
         log(f"wybrano {self.services[self.selected]['name']}")
+
+    def grid_columns(self):
+        return min(3, max(1, len(self.services)))
+
+    def move_horizontal(self, change):
+        columns = self.grid_columns()
+        row = self.selected // columns
+        column = self.selected % columns
+        column = (column + change) % columns
+        index = row * columns + column
+        if index < len(self.services):
+            self.selected = index
+            self.status = f"A uruchamia {self.services[self.selected]['name']}"
+            self.hint.set_label('')
+            self.update_selection()
+            log(f"wybrano {self.services[self.selected]['name']}")
+
+    def move_grid(self, change):
+        columns = self.grid_columns()
+        target = self.selected + change * columns
+        if 0 <= target < len(self.services):
+            self.selected = target
+            self.status = f"A uruchamia {self.services[self.selected]['name']}"
+            self.hint.set_label('')
+            self.update_selection()
+            log(f"wybrano {self.services[self.selected]['name']}")
 
     def forward_browser_key(self, button, held_ms=0):
         """Forward controller navigation as keys only; never as pointer input."""
@@ -870,6 +905,11 @@ window.tv-window {
         Ask the X11 window manager to activate the child only after it has a
         real window.  This is window focus management, not input delivery.
         """
+        browser_names = {
+            service.get('runtime_name')
+            for service in self.services
+            if service.get('kind') == 'browser'
+        }
         window_class = 'vacuumtube' if self.child_name == 'VacuumTube' else 'google-chrome'
         result = subprocess.run(
             ['/usr/bin/xdotool', 'search', '--class', window_class],
@@ -911,12 +951,10 @@ window.tv-window {
         try:
             self.chrome_keyboard.install_script(self.child_name, source)
         except Exception as error:
-            if time.monotonic() < self.script_deadline:
-                return True
-            log(f'nie zainstalowano skryptu fokusu dla {self.child_name}: {type(error).__name__}: {error}')
-            return False
-        log(f'skrypt fokusu dla {self.child_name} zainstalowany przez Chrome DevTools')
-        return False
+            if time.monotonic() >= self.script_deadline:
+                log(f'ponowienie instalacji skryptu fokusu dla {self.child_name}: {type(error).__name__}: {error}')
+            return True
+        return True
 
     def close_request(self, *_args):
         self.quit()

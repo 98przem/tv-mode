@@ -5,15 +5,21 @@
   style.textContent = `
     .handleNext, .handlePrev, .slider-button, [class*="handleNext"], [class*="handlePrev"],
     [data-uia="carousel-hawkins-right-button"], [data-uia="carousel-hawkins-left-button"] { opacity: 0 !important; }
+    .button-nfplayerBack, .button-nfplayerFullscreen, .nfplayer-back, .nfplayer-fullscreen,
+    [data-uia="control-nav-back"],
+    [data-uia="nfplayer-exit"], [data-uia*="fullscreen" i], [aria-label*="fullscreen" i],
+    [aria-label*="full screen" i], [aria-label="Back" i], [aria-label="Wstecz" i] {
+      display: none !important;
+    }
     [data-tv-mode-focus="true"] {
-      outline: 4px solid #ffffff !important;
-      outline-offset: 5px !important;
-      box-shadow: 0 0 0 8px rgba(20, 124, 255, 0.75), 0 0 22px rgba(20, 124, 255, 0.9) !important;
+      outline: 2px solid #ffffff !important;
+      outline-offset: 3px !important;
+      box-shadow: 0 0 0 4px rgba(20, 124, 255, 0.75), 0 0 12px rgba(20, 124, 255, 0.9) !important;
       border-radius: 6px !important;
     }
     [data-tv-mode-focus="true"][data-uia="timeline-knob"] {
-      outline: 5px solid #ffffff !important;
-      box-shadow: 0 0 0 9px rgba(20, 124, 255, 0.9), 0 0 24px rgba(20, 124, 255, 1) !important;
+      outline: 3px solid #ffffff !important;
+      box-shadow: 0 0 0 5px rgba(20, 124, 255, 0.9), 0 0 14px rgba(20, 124, 255, 1) !important;
       border-radius: 50% !important;
     }
   `;
@@ -373,9 +379,7 @@
     )].find(visible);
     if (searchInput) return 'b';
     if (inPlayer()) {
-      const playerExit = document.querySelector('[data-uia="nfplayer-exit"]');
-      if (!playerExit || visible(playerExit)) return 'PlayerBack';
-      return 'b';
+      return 'PlayerBack';
     }
     const candidates = [
       '[data-uia="player-back-button"]', '.button-nfplayerBack',
@@ -423,7 +427,6 @@
   const playerControls = () => {
     if (!inPlayer()) return [];
     const selectors = [
-      '[data-uia^="control-"]',
       '[data-uia^="control-play-pause"]',
       '[data-uia="control-back10"]',
       '[data-uia="control-forward10"]',
@@ -435,13 +438,17 @@
       '[data-uia="control-audio-subtitle"]',
       '[data-uia="control-speed"]',
     ];
-    const controls = selectors.flatMap(selector => [...document.querySelectorAll(selector)])
+    const explicit = selectors.flatMap(selector => [...document.querySelectorAll(selector)]);
+    const generic = [...document.querySelectorAll(
+      '.watch-video button, .watch-video [role="button"], .PlayerControlsNeo button, .PlayerControlsNeo [role="button"]'
+    )];
+    const controls = [...explicit, ...generic]
       .map(element => element.closest('button, [role="button"]') || element)
       .filter((element, index, all) => {
         if (!visible(element) || all.indexOf(element) !== index) return false;
         const uia = element.getAttribute('data-uia') || '';
-        const label = element.getAttribute('aria-label') || '';
-        return !/nav-back|fullscreen|player-back|control-back(?!10)/i.test(`${uia} ${label}`);
+        const label = element.getAttribute('aria-label') || element.textContent || '';
+        return !/nav-back|fullscreen|full screen|player-back|control-back(?!10)|\bback\b|\bwstecz\b/i.test(`${uia} ${label}`);
       });
     return controls;
   };
