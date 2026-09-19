@@ -4,6 +4,11 @@ TV mode is a controller-first launcher for Steam Game Mode. It presents a
 simple service dashboard and forwards controller navigation to browser-based
 streaming services through a private Chrome DevTools connection.
 
+## Documentation
+
+- Read [`docs/INSTALL.md`](docs/INSTALL.md) for installation.
+- Read [`docs/README.md`](docs/README.md) for documentation rules.
+
 The project is designed for user-local installation on SteamOS, Bazzite, and
 other Linux systems with Steam Game Mode, GTK4, SDL2, Python 3, and a
 Chromium-compatible browser.
