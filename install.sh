@@ -38,7 +38,9 @@ install -m 0755 "$SOURCE_DIR/launch" "$PREFIX/launch"
 install -m 0755 "$SOURCE_DIR/tv_mode.py" "$PREFIX/tv_mode.py"
 install -m 0755 "$SOURCE_DIR/steam_shortcut.py" "$PREFIX/steam_shortcut.py"
 install -m 0644 "$SOURCE_DIR/scripts/netflix-focus.js" "$PREFIX/scripts/netflix-focus.js"
-install -m 0644 "$SOURCE_DIR/services.json" "$CONFIG_DIR/services.json"
+if [[ ! -e "$CONFIG_DIR/services.json" ]]; then
+  install -m 0644 "$SOURCE_DIR/services.json" "$CONFIG_DIR/services.json"
+fi
 install -m 0644 "$SOURCE_DIR/99-tv-mode-8bitdo-input.rules" "$PREFIX/99-tv-mode-8bitdo-input.rules"
 
 python3 "$SOURCE_DIR/configure_services.py" "$CONFIG_DIR/services.json"

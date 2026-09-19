@@ -2,10 +2,12 @@
 """Install the TV mode launcher as a non-Steam shortcut."""
 import struct
 import zlib
+import os
 from pathlib import Path
 
 NAME = 'TV mode'
 EXE = Path(__file__).resolve().parent / 'launch'
+HOME = Path(os.environ.get('HOME', str(Path.home())))
 
 
 def read_object(data, pos=0):
@@ -47,7 +49,7 @@ def write_object(value):
 
 
 def main():
-    files = list(Path.home().glob('.steam/steam/userdata/*/config/shortcuts.vdf'))
+    files = list(HOME.glob('.steam/steam/userdata/*/config/shortcuts.vdf'))
     if len(files) != 1:
         raise SystemExit(f'expected one Steam shortcuts file, found {len(files)}')
     path = files[0]

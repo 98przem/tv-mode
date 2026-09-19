@@ -94,8 +94,9 @@ def load_services():
             log('konfiguracja usług jest pusta lub niepoprawna; używam domyślnej listy')
             value = DEFAULT_SERVICES
     for index, service in enumerate(value):
-        service.setdefault('runtime_name', service['profile'].replace('-', '').title())
-        service.setdefault('port', 9223 + index)
+        if service.get('kind') == 'browser':
+            service.setdefault('runtime_name', service['profile'].replace('-', '').title())
+            service.setdefault('port', 9223 + index)
     return value
 
 
@@ -862,7 +863,7 @@ window.tv-window {
             log(f'okno {self.child_name} aktywowane nad Big Picture Steam')
             self.window.set_visible(False)
             log(f'TV mode pozostaje aktywny jako proces Steam podczas {self.child_name}')
-            if self.child_name in {service.get('runtime_name') for service in self.services if service.get('kind') == 'browser'}:
+            if self.child_name == 'Netflix':
                 self.script_deadline = time.monotonic() + 8
                 GLib.timeout_add(250, self.install_web_script)
             return False
