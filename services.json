@@ -1,0 +1,72 @@
+[
+  {
+    "name": "YouTube",
+    "source": "VacuumTube",
+    "tag": "YOUTUBE",
+    "badge": "badge-youtube",
+    "description": "Odtwarzacz YouTube dla TV",
+    "kind": "vacuumtube"
+  },
+  {
+    "name": "Netflix",
+    "source": "netflix.com",
+    "tag": "NETFLIX",
+    "badge": "badge-netflix",
+    "description": "Filmy, seriale i programy",
+    "kind": "browser",
+    "url": "https://www.netflix.com/browse",
+    "profile": "netflix",
+    "runtime_name": "Netflix",
+    "port": 9224
+  },
+  {
+    "name": "Emby",
+    "source": "kotflix.local",
+    "tag": "EMBY",
+    "badge": "badge-emby",
+    "description": "Domowa biblioteka wideo",
+    "kind": "browser",
+    "url": "https://kotflix.local",
+    "profile": "emby",
+    "runtime_name": "Emby",
+    "port": 9223,
+    "host_resolver": "MAP kotflix.local 127.0.0.1",
+    "ignore_certificate_errors": true
+  },
+  {
+    "name": "Apple TV+",
+    "source": "tv.apple.com",
+    "tag": "APPLE TV+",
+    "badge": "badge-apple",
+    "description": "Katalog premium i seriale",
+    "kind": "browser",
+    "url": "https://tv.apple.com/",
+    "profile": "apple",
+    "runtime_name": "AppleTV",
+    "port": 9225
+  },
+  {
+    "name": "Canal+",
+    "source": "canalplus.com",
+    "tag": "CANAL+",
+    "badge": "badge-canal",
+    "description": "TV i seriale w jednym pakiecie",
+    "kind": "browser",
+    "url": "https://www.canalplus.com/pl/",
+    "profile": "canal",
+    "runtime_name": "CanalPlus",
+    "port": 9226
+  },
+  {
+    "name": "Xbox Cloud",
+    "source": "xbox.com/play",
+    "tag": "XBOX",
+    "badge": "badge-xbox",
+    "description": "Gry z chmury na telewizorze",
+    "kind": "browser",
+    "url": "https://www.xbox.com/play",
+    "profile": "xbox-cloud",
+    "runtime_name": "XboxCloud",
+    "port": 9227
+  }
+]
