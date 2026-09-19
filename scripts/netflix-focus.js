@@ -5,6 +5,17 @@
   style.textContent = `
     .handleNext, .handlePrev, .slider-button, [class*="handleNext"], [class*="handlePrev"],
     [data-uia="carousel-hawkins-right-button"], [data-uia="carousel-hawkins-left-button"] { opacity: 0 !important; }
+    [data-tv-mode-focus="true"] {
+      outline: 4px solid #ffffff !important;
+      outline-offset: 5px !important;
+      box-shadow: 0 0 0 8px rgba(20, 124, 255, 0.75), 0 0 22px rgba(20, 124, 255, 0.9) !important;
+      border-radius: 6px !important;
+    }
+    [data-tv-mode-focus="true"][data-uia="timeline-knob"] {
+      outline: 5px solid #ffffff !important;
+      box-shadow: 0 0 0 9px rgba(20, 124, 255, 0.9), 0 0 24px rgba(20, 124, 255, 1) !important;
+      border-radius: 50% !important;
+    }
   `;
   document.documentElement.append(style);
   let selected = null;
@@ -412,6 +423,7 @@
   const playerControls = () => {
     if (!inPlayer()) return [];
     const selectors = [
+      '[data-uia^="control-"]',
       '[data-uia^="control-play-pause"]',
       '[data-uia="control-back10"]',
       '[data-uia="control-forward10"]',
@@ -424,7 +436,13 @@
       '[data-uia="control-speed"]',
     ];
     const controls = selectors.flatMap(selector => [...document.querySelectorAll(selector)])
-      .filter((element, index, all) => visible(element) && all.indexOf(element) === index);
+      .map(element => element.closest('button, [role="button"]') || element)
+      .filter((element, index, all) => {
+        if (!visible(element) || all.indexOf(element) !== index) return false;
+        const uia = element.getAttribute('data-uia') || '';
+        const label = element.getAttribute('aria-label') || '';
+        return !/nav-back|fullscreen|player-back|control-back(?!10)/i.test(`${uia} ${label}`);
+      });
     return controls;
   };
   const playerTarget = () => {
@@ -458,6 +476,14 @@
         playerMode = 'controls';
         select(playerPlayButton() || controls[0]);
         return true;
+      }
+      if (controls.length) {
+        const index = controls.indexOf(current);
+        if (index >= 0) {
+          playerMode = 'controls';
+          select(controls[index]);
+          return true;
+        }
       }
       return true;
     }

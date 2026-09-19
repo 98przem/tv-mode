@@ -234,6 +234,9 @@ class ChromeKeyboard:
         self.netflix_source = (
             ROOT / 'scripts' / 'netflix-focus.js'
         ).read_text()
+        self.browser_source = (
+            ROOT / 'scripts' / 'browser-focus.js'
+        ).read_text()
 
     def endpoint(self, service, browser=False):
         port = self.ports[service]
@@ -373,6 +376,25 @@ class ChromeKeyboard:
             if value is not True and not isinstance(value, str):
                 raise RuntimeError('Netflix focus script handled no matching element')
             return
+        if service != 'Emby':
+            expression = (
+                f'window.__tvModeBrowserFocus?.handle('
+                f'{json.dumps(action)}, {int(held_ms)})'
+            )
+            with websocket_connect(self.endpoint(service), origin='http://localhost', open_timeout=1, close_timeout=1) as websocket:
+                result = self.command(websocket, 'Runtime.evaluate', {
+                    'expression': expression, 'returnByValue': True,
+                })
+                value = result.get('result', {}).get('result', {}).get('value')
+                if value is None:
+                    self.install_script_on_connection(websocket, self.browser_source, 'window.__tvModeBrowserFocus')
+                    result = self.command(websocket, 'Runtime.evaluate', {
+                        'expression': expression, 'returnByValue': True,
+                    })
+                    value = result.get('result', {}).get('result', {}).get('value')
+                if value is not True and not isinstance(value, str):
+                    raise RuntimeError(f'{service} browser focus script handled no matching element')
+            return
         key, code, virtual_key = self.KEYS[action]
         params = {'key': key, 'code': code, 'windowsVirtualKeyCode': virtual_key,
                   'nativeVirtualKeyCode': virtual_key}
@@ -383,18 +405,19 @@ class ChromeKeyboard:
     def install_script(self, service, source):
         """Install a content script for this isolated browser session."""
         with websocket_connect(self.endpoint(service), origin='http://localhost', open_timeout=1, close_timeout=1) as websocket:
-            self.install_script_on_connection(websocket, source)
+            ready = 'typeof window.__tvModeNetflixFocus' if service == 'Netflix' else 'typeof window.__tvModeBrowserFocus'
+            self.install_script_on_connection(websocket, source, ready)
 
-    def install_script_on_connection(self, websocket, source):
+    def install_script_on_connection(self, websocket, source, ready_expression='typeof window.__tvModeNetflixFocus'):
         self.command(websocket, 'Page.addScriptToEvaluateOnNewDocument', {'source': source})
         result = self.command(websocket, 'Runtime.evaluate', {'expression': source})
         if 'exceptionDetails' in result.get('result', {}):
             raise RuntimeError('Netflix focus script raised an exception')
         ready = self.command(websocket, 'Runtime.evaluate', {
-            'expression': 'typeof window.__tvModeNetflixFocus', 'returnByValue': True,
+            'expression': ready_expression, 'returnByValue': True,
         })
         if ready.get('result', {}).get('result', {}).get('value') != 'object':
-            raise RuntimeError('Netflix focus script did not expose its handler')
+            raise RuntimeError('browser focus script did not expose its handler')
 
 
 class TvMode(Gtk.Application):
@@ -453,10 +476,13 @@ class TvMode(Gtk.Application):
         header.append(subtitle)
         content.append(header)
 
-        tiles = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=24)
-        tiles.set_margin_top(40)
-        tiles.set_margin_bottom(40)
-        for service in self.services:
+        tile_grid = Gtk.Grid(column_spacing=24, row_spacing=24)
+        tile_grid.set_column_homogeneous(True)
+        tile_grid.set_row_homogeneous(True)
+        columns = min(3, max(1, len(self.services)))
+        tile_grid.set_margin_top(40)
+        tile_grid.set_margin_bottom(40)
+        for index, service in enumerate(self.services):
             name_text = service['name']
             source_text = service['source']
             tag_text = service['tag']
@@ -489,9 +515,9 @@ class TvMode(Gtk.Application):
             source.set_halign(Gtk.Align.START)
             tile.append(source)
 
-            tiles.append(tile)
+            tile_grid.attach(tile, index % columns, index // columns, 1, 1)
             self.tiles.append(tile)
-        content.append(tiles)
+        content.append(tile_grid)
 
         legend = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=28)
         legend.add_css_class('legend-bar')
@@ -709,7 +735,10 @@ window.tv-window {
             now = time.monotonic()
             browser_names = {service.get('runtime_name') for service in self.services if service.get('kind') == 'browser'}
             if self.child_name in browser_names and 'b' in keys and 'b' not in self.previous:
-                self.forward_browser_key('b')
+                if self.child_name == 'Emby':
+                    self.forward_browser_key('quit')
+                else:
+                    self.forward_browser_key('b')
             if {'view', 'menu'} <= keys:
                 if not self.return_started:
                     self.return_started = now
@@ -863,7 +892,7 @@ window.tv-window {
             log(f'okno {self.child_name} aktywowane nad Big Picture Steam')
             self.window.set_visible(False)
             log(f'TV mode pozostaje aktywny jako proces Steam podczas {self.child_name}')
-            if self.child_name == 'Netflix':
+            if self.child_name in browser_names and self.child_name != 'Emby':
                 self.script_deadline = time.monotonic() + 8
                 GLib.timeout_add(250, self.install_web_script)
             return False
@@ -878,7 +907,7 @@ window.tv-window {
     def install_web_script(self):
         if not self.child or self.child.poll() is not None:
             return False
-        source = (Path(__file__).resolve().parent / 'scripts' / 'netflix-focus.js').read_text()
+        source = self.chrome_keyboard.netflix_source if self.child_name == 'Netflix' else self.chrome_keyboard.browser_source
         try:
             self.chrome_keyboard.install_script(self.child_name, source)
         except Exception as error:
