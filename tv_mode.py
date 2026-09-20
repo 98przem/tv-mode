@@ -34,41 +34,41 @@ CONFIG = Path(os.environ.get(
 ))
 DEFAULT_SERVICES = [
     {
-        'name': 'YouTube', 'description': 'filmy i muzyka',
-        'icon': 'assets/youtube.svg',
+        'name': 'YouTube', 'source': 'VacuumTube', 'tag': 'YOUTUBE',
+        'badge': 'badge-youtube',
         'kind': 'vacuumtube',
     },
     {
-        'name': 'Emby', 'description': 'własna biblioteka',
-        'icon': 'assets/emby.svg',
+        'name': 'Emby', 'source': 'kotflix.local', 'tag': 'EMBY',
+        'badge': 'badge-emby',
         'kind': 'browser', 'url': EMBY_URL, 'profile': 'emby', 'port': 9223,
         'runtime_name': 'Emby', 'host_resolver': 'MAP kotflix.local 127.0.0.1',
         'ignore_certificate_errors': True,
     },
     {
-        'name': 'Netflix', 'description': 'filmy i seriale',
-        'icon': 'assets/netflix.svg',
+        'name': 'Netflix', 'source': 'netflix.com', 'tag': 'NETFLIX',
+        'badge': 'badge-netflix',
         'kind': 'browser', 'url': 'https://www.netflix.com/browse',
         'profile': 'netflix', 'port': 9224,
         'runtime_name': 'Netflix',
     },
     {
-        'name': 'Apple TV+', 'description': 'filmy i seriale premium',
-        'icon': 'assets/apple-tv.svg',
+        'name': 'Apple TV+', 'source': 'tv.apple.com', 'tag': 'APPLE TV+',
+        'badge': 'badge-apple',
         'kind': 'browser', 'url': 'https://tv.apple.com/',
         'profile': 'apple', 'port': 9225,
         'runtime_name': 'AppleTV',
     },
     {
-        'name': 'Canal+', 'description': 'telewizja i sport',
-        'icon': 'assets/canal.svg',
+        'name': 'Canal+', 'source': 'canalplus.com', 'tag': 'CANAL+',
+        'badge': 'badge-canal',
         'kind': 'browser', 'url': 'https://www.canalplus.com/pl/',
         'profile': 'canal', 'port': 9226,
         'runtime_name': 'CanalPlus',
     },
     {
-        'name': 'Xbox Cloud', 'description': 'gry z chmury',
-        'icon': 'assets/xbox.svg',
+        'name': 'Xbox Cloud', 'source': 'xbox.com/play', 'tag': 'XBOX',
+        'badge': 'badge-xbox',
         'kind': 'browser', 'url': 'https://www.xbox.com/play',
         'profile': 'xbox-cloud', 'port': 9227,
         'runtime_name': 'XboxCloud',
@@ -94,10 +94,6 @@ def load_services():
             log('konfiguracja usług jest pusta lub niepoprawna; używam domyślnej listy')
             value = DEFAULT_SERVICES
     for index, service in enumerate(value):
-        default = next((item for item in DEFAULT_SERVICES if item['name'] == service.get('name')), None)
-        if default:
-            service['description'] = default['description']
-            service['icon'] = default['icon']
         if service.get('kind') == 'browser':
             service.setdefault('runtime_name', service['profile'].replace('-', '').title())
             service.setdefault('port', 9223 + index)
@@ -120,7 +116,6 @@ def browser_command(service, profile):
     command.extend([
         f'--user-data-dir={profile}', '--ozone-platform=x11', '--kiosk',
         '--no-first-run', '--no-default-browser-check',
-        '--force-dark-mode', '--start-minimized',
         '--remote-debugging-address=127.0.0.1',
         f"--remote-debugging-port={service['port']}",
         '--remote-allow-origins=http://localhost',
@@ -477,96 +472,86 @@ class TvMode(Gtk.Application):
         title.add_css_class('title')
         title.set_halign(Gtk.Align.START)
         header.append(title)
-        subtitle = Gtk.Label(label='Wybierz usługę')
+        subtitle = Gtk.Label(label='Wybierz aplikację do uruchomienia na telewizorze')
         subtitle.add_css_class('subtitle')
         subtitle.set_halign(Gtk.Align.START)
         header.append(subtitle)
         content.append(header)
 
-        banner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=18)
-        banner.add_css_class('hero-banner')
-        banner_icon = Gtk.Image.new_from_file(str(ROOT / 'assets' / 'tv-mode.svg'))
-        banner_icon.set_pixel_size(76)
-        banner.append(banner_icon)
-        banner_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        banner_title = Gtk.Label(label='twoja rozrywka')
-        banner_title.add_css_class('banner-title')
-        banner_title.set_halign(Gtk.Align.START)
-        banner_text.append(banner_title)
-        banner_subtitle = Gtk.Label(label='wszystkie usługi w jednym miejscu')
-        banner_subtitle.add_css_class('banner-subtitle')
-        banner_subtitle.set_halign(Gtk.Align.START)
-        banner_text.append(banner_subtitle)
-        banner.append(banner_text)
-        content.append(banner)
-
-        tile_grid = Gtk.Grid(column_spacing=18, row_spacing=18)
+        tile_grid = Gtk.Grid(column_spacing=24, row_spacing=24)
         tile_grid.set_column_homogeneous(True)
         tile_grid.set_row_homogeneous(True)
         columns = min(3, max(1, len(self.services)))
-        tile_grid.set_margin_top(24)
-        tile_grid.set_margin_bottom(28)
+        tile_grid.set_margin_top(40)
+        tile_grid.set_margin_bottom(40)
         for index, service in enumerate(self.services):
             name_text = service['name']
-            desc_text = service['description']
+            source_text = service['source']
             tile = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
             tile.add_css_class('tile')
-            tile.set_size_request(300, 140)
-
-            icon = Gtk.Image.new_from_file(str(ROOT / service.get('icon', 'assets/tv-mode.svg')))
-            icon.set_pixel_size(58)
-            icon.set_valign(Gtk.Align.CENTER)
-            tile.append(icon)
+            tile.set_size_request(340, 190)
 
             name = Gtk.Label(label=name_text)
             name.add_css_class('tile-title')
             name.set_halign(Gtk.Align.START)
             tile.append(name)
 
-            desc = Gtk.Label(label=desc_text)
-            desc.add_css_class('tile-detail')
-            desc.set_halign(Gtk.Align.START)
-            tile.append(desc)
+            source = Gtk.Label(label=source_text)
+            source.add_css_class('tile-source')
+            source.set_halign(Gtk.Align.START)
+            tile.append(source)
 
             tile_grid.attach(tile, index % columns, index // columns, 1, 1)
             self.tiles.append(tile)
         content.append(tile_grid)
 
-        legend = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=20)
+        legend = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=28)
         legend.add_css_class('legend-bar')
-        legend.set_hexpand(True)
+        legend.set_halign(Gtk.Align.START)
 
         # A action
         a_item = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        self.action_label = Gtk.Label(label=f"(A) Uruchom {self.services[self.selected]['name']}")
+        a_badge = Gtk.Label(label='A')
+        a_badge.add_css_class('btn-badge')
+        a_badge.add_css_class('btn-a')
+        self.action_label = Gtk.Label(label=f"Uruchom {self.services[self.selected]['name']}")
         self.action_label.add_css_class('legend-label')
+        a_item.append(a_badge)
         a_item.append(self.action_label)
         legend.append(a_item)
 
-        spacer = Gtk.Box()
-        spacer.set_hexpand(True)
-        legend.append(spacer)
-
-        right_legend = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=22)
-        right_legend.add_css_class('legend-right')
-        nav_label = Gtk.Label(label='← ↑ ↓ →  Wybór')
+        # Navigation
+        nav_item = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        nav_badge = Gtk.Label(label='◄  ►')
+        nav_badge.add_css_class('btn-badge')
+        nav_badge.add_css_class('btn-nav')
+        nav_label = Gtk.Label(label='Wybór')
         nav_label.add_css_class('legend-label-subtle')
-        right_legend.append(nav_label)
+        nav_item.append(nav_badge)
+        nav_item.append(nav_label)
+        legend.append(nav_item)
 
         # B quit
         b_item = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        b_label = Gtk.Label(label='(B) Wyjdź do Steam')
+        b_badge = Gtk.Label(label='B')
+        b_badge.add_css_class('btn-badge')
+        b_badge.add_css_class('btn-b')
+        b_label = Gtk.Label(label='Wyjdź do Steam')
         b_label.add_css_class('legend-label-subtle')
+        b_item.append(b_badge)
         b_item.append(b_label)
-        right_legend.append(b_item)
+        legend.append(b_item)
 
         # 8BitDo minus/plus return shortcut
         combo_item = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        combo_label = Gtk.Label(label='(- +) Powrót')
+        combo_badge = Gtk.Label(label='- +')
+        combo_badge.add_css_class('btn-badge')
+        combo_badge.add_css_class('btn-combo')
+        combo_label = Gtk.Label(label='Powrót')
         combo_label.add_css_class('legend-label-subtle')
+        combo_item.append(combo_badge)
         combo_item.append(combo_label)
-        right_legend.append(combo_item)
-        legend.append(right_legend)
+        legend.append(combo_item)
 
         content.append(legend)
 
@@ -589,61 +574,43 @@ window.tv-window {
     color: #f0f2f5;
 }
 .title {
-font-size: 34px;
+    font-size: 40px;
     font-weight: 800;
     color: #ffffff;
 }
 .subtitle {
-    font-size: 16px;
+    font-size: 18px;
     color: #8e93a0;
     margin-top: 4px;
 }
-.hero-banner {
-    background: linear-gradient(110deg, #202b4a, #171a27);
-    border: 1px solid #344064;
-    border-radius: 22px;
-    padding: 18px 24px;
-    min-width: 920px;
-}
-.banner-title {
-    font-size: 26px;
-    font-weight: 800;
-    color: #ffffff;
-}
-.banner-subtitle {
-    font-size: 15px;
-    color: #aeb9d8;
-}
 .tile {
-    background-color: #171a23;
+    background-color: #1a1c24;
     border: 2px solid #2b2e3a;
-    border-radius: 18px;
-    padding: 18px 20px;
-    min-width: 300px;
+    border-radius: 20px;
+    padding: 24px 22px;
+    min-width: 340px;
 }
 .tile.selected {
     background-color: #242835;
-    border: 3px solid #6e9cff;
-    box-shadow: 0 0 0 4px rgba(110, 156, 255, 0.18);
+    border: 3px solid #ffffff;
 }
-
 .tile-title {
-    font-size: 24px;
+    font-size: 28px;
     font-weight: 700;
     color: #ffffff;
     margin-top: 10px;
 }
-.tile-detail {
-    font-size: 15px;
-    color: #bfc4d0;
-    margin-top: 4px;
+.tile-source {
+    font-size: 13px;
+    color: #6b7280;
+    margin-top: 6px;
 }
+
 .legend-bar {
     background-color: #15171e;
     border: 1px solid #232631;
     border-radius: 16px;
-    padding: 14px 20px;
-    min-width: 920px;
+    padding: 12px 24px;
 }
 .legend-label {
     font-size: 16px;
@@ -651,11 +618,8 @@ font-size: 34px;
     font-weight: 600;
 }
 .legend-label-subtle {
-    font-size: 14px;
+    font-size: 15px;
     color: #8a8f9e;
-}
-.legend-right {
-    margin-left: auto;
 }
 .btn-badge {
     font-size: 14px;

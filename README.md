@@ -58,7 +58,6 @@ is expected to be read directly by SDL.
 
 - `tv_mode.py` — GTK dashboard, SDL polling, browser process management
 - `scripts/netflix-focus.js` — Netflix DOM focus and player controls
-- `assets/` — local service icons and TV mode artwork
 - `services.json` — example service selection
 - `install.sh` — repeatable user-local installation
 - `steam_shortcut.py` — Steam shortcut registration

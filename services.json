@@ -1,14 +1,16 @@
 [
   {
     "name": "YouTube",
-    "description": "filmy i muzyka",
-    "icon": "assets/youtube.svg",
+    "source": "VacuumTube",
+    "tag": "YOUTUBE",
+    "badge": "badge-youtube",
     "kind": "vacuumtube"
   },
   {
     "name": "Netflix",
-    "description": "filmy i seriale",
-    "icon": "assets/netflix.svg",
+    "source": "netflix.com",
+    "tag": "NETFLIX",
+    "badge": "badge-netflix",
     "kind": "browser",
     "url": "https://www.netflix.com/browse",
     "profile": "netflix",
@@ -17,8 +19,9 @@
   },
   {
     "name": "Emby",
-    "description": "własna biblioteka",
-    "icon": "assets/emby.svg",
+    "source": "kotflix.local",
+    "tag": "EMBY",
+    "badge": "badge-emby",
     "kind": "browser",
     "url": "https://kotflix.local",
     "profile": "emby",
@@ -29,8 +32,9 @@
   },
   {
     "name": "Apple TV+",
-    "description": "filmy i seriale premium",
-    "icon": "assets/apple-tv.svg",
+    "source": "tv.apple.com",
+    "tag": "APPLE TV+",
+    "badge": "badge-apple",
     "kind": "browser",
     "url": "https://tv.apple.com/",
     "profile": "apple",
@@ -39,8 +43,9 @@
   },
   {
     "name": "Canal+",
-    "description": "telewizja i sport",
-    "icon": "assets/canal.svg",
+    "source": "canalplus.com",
+    "tag": "CANAL+",
+    "badge": "badge-canal",
     "kind": "browser",
     "url": "https://www.canalplus.com/pl/",
     "profile": "canal",
@@ -49,8 +54,9 @@
   },
   {
     "name": "Xbox Cloud",
-    "description": "gry z chmury",
-    "icon": "assets/xbox.svg",
+    "source": "xbox.com/play",
+    "tag": "XBOX",
+    "badge": "badge-xbox",
     "kind": "browser",
     "url": "https://www.xbox.com/play",
     "profile": "xbox-cloud",
