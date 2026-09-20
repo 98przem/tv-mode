@@ -487,12 +487,14 @@ class TvMode(Gtk.Application):
         for index, service in enumerate(self.services):
             name_text = service['name']
             source_text = service['source']
+            badge_class = service.get('badge', 'badge-default')
             tile = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
             tile.add_css_class('tile')
             tile.set_size_request(340, 190)
 
             name = Gtk.Label(label=name_text)
-            name.add_css_class('tile-title')
+            name.add_css_class('service-name')
+            name.add_css_class(badge_class)
             name.set_halign(Gtk.Align.START)
             tile.append(name)
 
@@ -507,7 +509,8 @@ class TvMode(Gtk.Application):
 
         legend = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=28)
         legend.add_css_class('legend-bar')
-        legend.set_halign(Gtk.Align.START)
+        legend.set_halign(Gtk.Align.FILL)
+        legend.set_hexpand(True)
 
         # A action
         a_item = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
@@ -520,6 +523,13 @@ class TvMode(Gtk.Application):
         a_item.append(self.action_label)
         legend.append(a_item)
 
+        spacer = Gtk.Box()
+        spacer.set_hexpand(True)
+        legend.append(spacer)
+
+        right_controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=28)
+        right_controls.set_halign(Gtk.Align.END)
+
         # Navigation
         nav_item = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         nav_badge = Gtk.Label(label='◄  ►')
@@ -529,7 +539,7 @@ class TvMode(Gtk.Application):
         nav_label.add_css_class('legend-label-subtle')
         nav_item.append(nav_badge)
         nav_item.append(nav_label)
-        legend.append(nav_item)
+        right_controls.append(nav_item)
 
         # B quit
         b_item = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
@@ -540,18 +550,19 @@ class TvMode(Gtk.Application):
         b_label.add_css_class('legend-label-subtle')
         b_item.append(b_badge)
         b_item.append(b_label)
-        legend.append(b_item)
+        right_controls.append(b_item)
 
         # 8BitDo minus/plus return shortcut
         combo_item = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        combo_badge = Gtk.Label(label='- +')
+        combo_badge = Gtk.Label(label='Select')
         combo_badge.add_css_class('btn-badge')
         combo_badge.add_css_class('btn-combo')
         combo_label = Gtk.Label(label='Powrót')
         combo_label.add_css_class('legend-label-subtle')
         combo_item.append(combo_badge)
         combo_item.append(combo_label)
-        legend.append(combo_item)
+        right_controls.append(combo_item)
+        legend.append(right_controls)
 
         content.append(legend)
 
@@ -594,12 +605,21 @@ window.tv-window {
     background-color: #242835;
     border: 3px solid #ffffff;
 }
-.tile-title {
-    font-size: 28px;
+.service-name {
+    font-size: 23px;
     font-weight: 700;
     color: #ffffff;
-    margin-top: 10px;
+    padding: 6px 12px;
+    border-radius: 10px;
+    margin-top: 4px;
 }
+.badge-youtube { background-color: rgba(230, 33, 23, 0.28); }
+.badge-emby { background-color: rgba(46, 125, 50, 0.30); }
+.badge-netflix { background-color: rgba(229, 9, 20, 0.30); }
+.badge-apple { background-color: rgba(107, 122, 253, 0.30); }
+.badge-canal { background-color: rgba(243, 182, 63, 0.30); color: #ffe6a5; }
+.badge-xbox { background-color: rgba(61, 194, 108, 0.30); }
+.badge-default { background-color: rgba(140, 150, 170, 0.25); }
 .tile-source {
     font-size: 13px;
     color: #6b7280;
