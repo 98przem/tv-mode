@@ -19,23 +19,39 @@
       box.top < innerHeight && box.left < innerWidth;
   };
   const selector = 'button:not([disabled]), a[href], [role="button"], [role="link"], ' +
-    '[role="option"], [role="menuitem"], input:not([disabled]), select:not([disabled])';
+    '[role="option"], [role="menuitem"], input:not([disabled]), textarea:not([disabled]), ' +
+    'select:not([disabled]), [contenteditable="true"]';
   const all = () => [...document.querySelectorAll(selector)].filter(visible);
   const modal = () => [...document.querySelectorAll(
     '[role="dialog"], [role="alertdialog"], [aria-modal="true"], [id*="cookie" i], ' +
-    '[class*="cookie" i], [class*="consent" i], [data-testid*="cookie" i]'
+    '[class*="cookie" i], [class*="consent" i], [data-testid*="cookie" i], ' +
+    'iframe[src*="commerce" i], iframe[title*="sign" i], iframe[title*="login" i]'
   )].filter(visible).sort((a, b) => {
     const aa = a.getBoundingClientRect(), bb = b.getBoundingClientRect();
     return bb.width * bb.height - aa.width * aa.height;
   })[0] || null;
   const scoped = () => {
     const root = modal();
-    return (root ? [...root.querySelectorAll(selector)] : all()).filter(visible);
+    if (!root) return all();
+    const items = [...root.querySelectorAll(selector)].filter(visible);
+    return items.length ? items : [root];
   };
   const text = element => `${element.textContent || ''} ${element.getAttribute('aria-label') || ''}`;
   const initial = items => items.find(item =>
-    /accept|agree|allow|consent|continue|ok|zaakceptuj|zgadzam|zezwól|kontynuuj|dalej/i.test(text(item))
-  ) || items.find(item => item.matches('button, [role="button"]')) || items[0];
+    /sign in|log in|zaloguj/i.test(text(item))
+  ) || items.find(item => item.matches('input, textarea, [contenteditable="true"]')) ||
+    items.find(item =>
+      /accept|agree|allow|consent|continue|ok|zaakceptuj|zgadzam|zezwól|kontynuuj|dalej/i.test(text(item))
+    ) ||
+    items.find(item => item.matches('button, [role="button"]')) || items[0];
+  const focusResult = () => {
+    if (!selected) return true;
+    if (selected.matches('input, textarea, iframe, [contenteditable="true"]')) {
+      const box = selected.getBoundingClientRect();
+      return `InputFocus:${box.x},${box.y},${box.width},${box.height}`;
+    }
+    return true;
+  };
   const select = element => {
     if (!element) return;
     document.querySelectorAll('[data-tv-mode-focus="true"]').forEach(item =>
@@ -51,6 +67,10 @@
     if (!selected || !items.includes(selected)) select(initial(items));
     if (!selected) return false;
     selected.click();
+    setTimeout(() => {
+      const root = modal();
+      if (root) select(root);
+    }, 80);
     return true;
   };
   const back = () => {
@@ -95,7 +115,10 @@
     handle(action) {
       if (action === 'a') return activate();
       if (action === 'b') return back();
-      if (['up', 'down', 'left', 'right'].includes(action)) return move(action);
+      if (['up', 'down', 'left', 'right'].includes(action)) {
+        move(action);
+        return focusResult();
+      }
       return true;
     },
   };

@@ -307,6 +307,25 @@ class ChromeKeyboard:
                 'clickCount': 1,
             })
 
+    @staticmethod
+    def open_steam_keyboard(bounds):
+        x, y, width, height = (
+            max(0, int(round(float(value)))) for value in bounds
+        )
+        uri = (
+            'steam://open/keyboard'
+            f'?XPosition={x}&YPosition={y}&Width={width}&Height={height}&Mode=1'
+        )
+        steam = shutil.which('steam')
+        if not steam:
+            raise RuntimeError('Nie znaleziono klienta Steam do otwarcia klawiatury')
+        subprocess.Popen(
+            [steam, uri],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+
     def tap(self, service, action, held_ms=0):
         if action == 'quit':
             with websocket_connect(self.endpoint(service, browser=True), origin='http://localhost', open_timeout=1, close_timeout=1) as websocket:
@@ -396,6 +415,10 @@ class ChromeKeyboard:
                     value = result.get('result', {}).get('result', {}).get('value')
                 if value is not True and not isinstance(value, str):
                     raise RuntimeError(f'{service} browser focus script handled no matching element')
+                if isinstance(value, str) and value.startswith('InputFocus:'):
+                    bounds = value.removeprefix('InputFocus:').split(',')
+                    if len(bounds) == 4:
+                        self.open_steam_keyboard(bounds)
             return
         key, code, virtual_key = self.KEYS[action]
         params = {'key': key, 'code': code, 'windowsVirtualKeyCode': virtual_key,
@@ -554,7 +577,7 @@ class TvMode(Gtk.Application):
 
         # 8BitDo minus/plus return shortcut
         combo_item = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        combo_badge = Gtk.Label(label='Select')
+        combo_badge = Gtk.Label(label='Select + Start')
         combo_badge.add_css_class('btn-badge')
         combo_badge.add_css_class('btn-combo')
         combo_label = Gtk.Label(label='Powrót')
