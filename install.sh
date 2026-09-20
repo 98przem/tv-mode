@@ -39,6 +39,8 @@ install -m 0755 "$SOURCE_DIR/tv_mode.py" "$PREFIX/tv_mode.py"
 install -m 0755 "$SOURCE_DIR/steam_shortcut.py" "$PREFIX/steam_shortcut.py"
 install -m 0644 "$SOURCE_DIR/scripts/netflix-focus.js" "$PREFIX/scripts/netflix-focus.js"
 install -m 0644 "$SOURCE_DIR/scripts/browser-focus.js" "$PREFIX/scripts/browser-focus.js"
+mkdir -p "$PREFIX/assets"
+install -m 0644 "$SOURCE_DIR"/assets/*.svg "$PREFIX/assets/"
 if [[ ! -e "$CONFIG_DIR/services.json" ]]; then
   install -m 0644 "$SOURCE_DIR/services.json" "$CONFIG_DIR/services.json"
 fi
