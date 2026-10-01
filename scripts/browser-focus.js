@@ -4,9 +4,9 @@
   const style = document.createElement('style');
   style.textContent = `
     [data-tv-mode-focus="true"] {
-      outline: 4px solid #ffffff !important;
-      outline-offset: 5px !important;
-      box-shadow: 0 0 0 8px rgba(20, 124, 255, 0.75), 0 0 22px rgba(20, 124, 255, 0.9) !important;
+      outline: 2px solid rgba(235, 235, 235, 0.92) !important;
+      outline-offset: 3px !important;
+      box-shadow: 0 0 0 3px rgba(125, 125, 125, 0.58), 0 0 10px rgba(0, 0, 0, 0.72) !important;
       border-radius: 6px !important;
     }
   `;
@@ -66,12 +66,8 @@
     const items = scoped();
     if (!selected || !items.includes(selected)) select(initial(items));
     if (!selected) return false;
-    selected.click();
-    setTimeout(() => {
-      const root = modal();
-      if (root) select(root);
-    }, 80);
-    return true;
+    const box = selected.getBoundingClientRect();
+    return `BrowserClick:${box.left + box.width / 2}:${box.top + box.height / 2}`;
   };
   const back = () => {
     const root = modal();
@@ -79,7 +75,10 @@
       const close = [...root.querySelectorAll('button, [role="button"]')].find(item =>
         visible(item) && /close|cancel|reject|zamknij|anuluj|odrzuć/i.test(text(item))
       );
-      if (close) { close.click(); return true; }
+      if (close) {
+        const box = close.getBoundingClientRect();
+        return `BrowserClick:${box.left + box.width / 2}:${box.top + box.height / 2}`;
+      }
     }
     const path = location.pathname.replace(/\/+$/, '') || '/';
     const host = location.hostname;
@@ -95,6 +94,7 @@
     const items = scoped();
     if (!items.length) return false;
     if (!selected || !items.includes(selected)) { select(initial(items)); return true; }
+    if (selected.matches('iframe')) return `NativeKey:${action}`;
     const from = selected.getBoundingClientRect();
     const horizontal = action === 'left' || action === 'right';
     const sign = action === 'left' || action === 'up' ? -1 : 1;
@@ -103,8 +103,7 @@
       const box = item.getBoundingClientRect();
       const dx = box.left + box.width / 2 - (from.left + from.width / 2);
       const dy = box.top + box.height / 2 - (from.top + from.height / 2);
-      return sign * (horizontal ? dx : dy) > 8 &&
-        Math.abs(horizontal ? dy : dx) < (horizontal ? Math.max(80, from.height) : Math.max(140, from.width));
+      return sign * (horizontal ? dx : dy) > 4;
     });
     candidates.sort((a, b) => {
       const aa = a.getBoundingClientRect(), bb = b.getBoundingClientRect();
@@ -112,21 +111,45 @@
       const ay = Math.abs((aa.top + aa.height / 2) - (from.top + from.height / 2));
       const bx = Math.abs((bb.left + bb.width / 2) - (from.left + from.width / 2));
       const by = Math.abs((bb.top + bb.height / 2) - (from.top + from.height / 2));
-      return (horizontal ? ax + ay * 0.5 : ay + ax * 0.5) -
-        (horizontal ? bx + by * 0.5 : by + bx * 0.5);
+      const primaryA = horizontal ? ax : ay;
+      const crossA = horizontal ? ay : ax;
+      const primaryB = horizontal ? bx : by;
+      const crossB = horizontal ? by : bx;
+      const scoreA = primaryA + crossA * 1.8 + (crossA * crossA) / (primaryA + 1) * 0.08;
+      const scoreB = primaryB + crossB * 1.8 + (crossB * crossB) / (primaryB + 1) * 0.08;
+      return scoreA - scoreB;
     });
     if (candidates[0]) select(candidates[0]);
+    return true;
+  };
+  const page = direction => {
+    scrollBy({top: direction * innerHeight * 0.78, behavior: 'instant'});
+    const items = scoped();
+    if (!items.length) return false;
+    const targetY = direction > 0 ? innerHeight * 0.32 : innerHeight * 0.68;
+    items.sort((a, b) =>
+      Math.abs(a.getBoundingClientRect().top - targetY) -
+      Math.abs(b.getBoundingClientRect().top - targetY)
+    );
+    select(items[0]);
     return true;
   };
   window.__tvModeBrowserFocus = {
     handle(action) {
       if (action === 'a') return activate();
       if (action === 'b') return back();
+      if (action === 'lb') return page(-1);
+      if (action === 'rb') return page(1);
       if (['up', 'down', 'left', 'right'].includes(action)) {
-        move(action);
-        return focusResult();
+        const result = move(action);
+        return typeof result === 'string' ? result : focusResult();
       }
       return true;
     },
   };
+  const seedFocus = () => {
+    const items = scoped();
+    if ((!selected || !items.includes(selected)) && items.length) select(initial(items));
+  };
+  [0, 180, 450, 900, 1600].forEach(delay => setTimeout(seedFocus, delay));
 })();

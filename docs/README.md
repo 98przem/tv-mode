@@ -3,7 +3,11 @@
 ## Documents
 
 - `INSTALL.md` explains installation and removal.
+- `STEAMOS.md` explains a clean SteamOS installation.
+- `DECKY_PLAN.md` evaluates a future Decky Loader interface.
+- `SERVICE_AUDIT.md` records controller and scaling behavior.
 - The root `README.md` explains the project and its files.
+- `../handoff/HANDOFF.md` contains the project handoff.
 
 ## Writing rules
 

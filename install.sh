@@ -10,7 +10,7 @@ die() { printf 'tv-mode: error: %s\n' "$*" >&2; exit 1; }
 
 command -v python3 >/dev/null || die "python3 is required"
 
-if [[ ! -e /usr/lib64/libSDL2-2.0.so.0 && ! -e /usr/lib/x86_64-linux-gnu/libSDL2-2.0.so.0 ]]; then
+if [[ ! -e /usr/lib/libSDL2-2.0.so.0 && ! -e /usr/lib64/libSDL2-2.0.so.0 && ! -e /usr/lib/x86_64-linux-gnu/libSDL2-2.0.so.0 ]]; then
   say "SDL2 runtime was not detected; install SDL2 before launching TV mode."
 fi
 
@@ -37,6 +37,7 @@ mkdir -p "$PREFIX/scripts" "$CONFIG_DIR"
 install -m 0755 "$SOURCE_DIR/launch" "$PREFIX/launch"
 install -m 0755 "$SOURCE_DIR/tv_mode.py" "$PREFIX/tv_mode.py"
 install -m 0755 "$SOURCE_DIR/steam_shortcut.py" "$PREFIX/steam_shortcut.py"
+install -m 0755 "$SOURCE_DIR/uninstall.sh" "$PREFIX/uninstall.sh"
 install -m 0644 "$SOURCE_DIR/scripts/netflix-focus.js" "$PREFIX/scripts/netflix-focus.js"
 install -m 0644 "$SOURCE_DIR/scripts/browser-focus.js" "$PREFIX/scripts/browser-focus.js"
 if [[ ! -e "$CONFIG_DIR/services.json" ]]; then

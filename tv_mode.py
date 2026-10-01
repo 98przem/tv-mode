@@ -71,7 +71,7 @@ DEFAULT_SERVICES = [
         'badge': 'badge-xbox',
         'kind': 'browser', 'url': 'https://www.xbox.com/play',
         'profile': 'xbox-cloud', 'port': 9227,
-        'runtime_name': 'XboxCloud',
+        'runtime_name': 'XboxCloud', 'input': 'native_gamepad',
     },
 ]
 
@@ -97,6 +97,8 @@ def load_services():
         if service.get('kind') == 'browser':
             service.setdefault('runtime_name', service['profile'].replace('-', '').title())
             service.setdefault('port', 9223 + index)
+            if service.get('runtime_name') == 'XboxCloud':
+                service['input'] = 'native_gamepad'
     return value
 
 
@@ -156,6 +158,7 @@ class Controllers:
             ('SDL_GameControllerGetAxis', C.c_short, [C.c_void_p, C.c_int]),
             ('SDL_GameControllerUpdate', None, []),
             ('SDL_PumpEvents', None, []),
+            ('SDL_Quit', None, []),
         ]
         for name, result, args in declarations:
             function = getattr(self.sdl, name)
@@ -209,6 +212,7 @@ class Controllers:
         for pad in self.pads:
             self.sdl.SDL_GameControllerClose(pad)
         self.pads = []
+        self.sdl.SDL_Quit()
 
 
 class ChromeKeyboard:
@@ -479,6 +483,18 @@ class ChromeKeyboard:
                     with websocket_connect(self.endpoint(service, browser=True), origin='http://localhost', open_timeout=1, close_timeout=1) as browser:
                         self.command(browser, 'Browser.close')
                     return
+                if isinstance(value, str) and value.startswith('BrowserClick:'):
+                    _, x, y = value.split(':', 2)
+                    self.click_point(websocket, x, y)
+                    return
+                if isinstance(value, str) and value.startswith('NativeKey:'):
+                    native_action = value.removeprefix('NativeKey:')
+                    key, code, virtual_key = self.KEYS[native_action]
+                    params = {'key': key, 'code': code, 'windowsVirtualKeyCode': virtual_key,
+                              'nativeVirtualKeyCode': virtual_key}
+                    self.command(websocket, 'Input.dispatchKeyEvent', {'type': 'keyDown', **params})
+                    self.command(websocket, 'Input.dispatchKeyEvent', {'type': 'keyUp', **params})
+                    return
                 if value is not True and not isinstance(value, str):
                     raise RuntimeError(f'{service} browser focus script handled no matching element')
                 if isinstance(value, str) and value.startswith('InputFocus:'):
@@ -521,6 +537,7 @@ class TvMode(Gtk.Application):
         self.focus_deadline = 0.0
         self.child = None
         self.child_name = None
+        self.child_native_gamepad = False
         self.services = load_services()
         self.chrome_keyboard = ChromeKeyboard(self.services)
         self.selected = 0
@@ -809,16 +826,16 @@ window.tv-window {
         return False
 
     def poll_controllers(self):
-        keys = self.controllers.pressed()
+        keys = self.controllers.pressed() if self.controllers else set()
         if self.child:
             now = time.monotonic()
             browser_names = {service.get('runtime_name') for service in self.services if service.get('kind') == 'browser'}
-            if self.child_name in browser_names and 'b' in keys and 'b' not in self.previous:
+            if not self.child_native_gamepad and self.child_name in browser_names and 'b' in keys and 'b' not in self.previous:
                 if self.child_name == 'Emby':
                     self.forward_browser_key('quit')
                 else:
                     self.forward_browser_key('b')
-            if {'view', 'menu'} <= keys:
+            if not self.child_native_gamepad and {'view', 'menu'} <= keys:
                 if not self.return_started:
                     self.return_started = now
                 elif now - self.return_started >= 1.2:
@@ -833,7 +850,7 @@ window.tv-window {
                     self.return_started = now + 10
             else:
                 self.return_started = 0.0
-            if self.child_name in browser_names:
+            if not self.child_native_gamepad and self.child_name in browser_names:
                 new = keys - self.previous
                 for button in ('up', 'down', 'left', 'right', 'lb', 'rb', 'a', 'x'):
                     if button in new:
@@ -862,7 +879,11 @@ window.tv-window {
                 log(f'{self.child_name} zakończone, exit={self.child.returncode}')
                 self.child = None
                 self.child_name = None
+                self.child_native_gamepad = False
                 self.previous = set()
+                if self.controllers is None:
+                    self.controllers = Controllers()
+                    log('wznowiono SDL po zamknięciu usługi z natywnym gamepadem')
                 self.status = f"A uruchamia {self.services[self.selected]['name']}"
                 self.hint.set_label('')
                 self.update_selection()
@@ -964,8 +985,17 @@ window.tv-window {
                 profile = Path.home() / '.var' / 'app' / 'com.google.Chrome' / 'config' / f"tv-mode-{service['profile']}-profile"
                 profile.mkdir(parents=True, exist_ok=True)
                 command = browser_command(service, profile)
+            self.child_native_gamepad = service.get('input') == 'native_gamepad'
+            if self.child_native_gamepad and self.controllers:
+                self.controllers.close()
+                self.controllers = None
+                self.previous = set()
+                log(f'{name}: wyłączono SDL i most wejścia; kontroler trafia natywnie do usługi')
             self.child = subprocess.Popen(command, env=env, start_new_session=True)
         except OSError as error:
+            self.child_native_gamepad = False
+            if self.controllers is None:
+                self.controllers = Controllers()
             self.status = f'Nie udało się uruchomić {name}'
             self.hint.set_label(self.status)
             log(f'błąd uruchomienia {name}: {error}')
@@ -1006,7 +1036,7 @@ window.tv-window {
             log(f'okno {self.child_name} aktywowane nad Big Picture Steam')
             self.window.set_visible(False)
             log(f'TV mode pozostaje aktywny jako proces Steam podczas {self.child_name}')
-            if self.child_name in browser_names and self.child_name != 'Emby':
+            if self.child_name in browser_names and self.child_name != 'Emby' and not self.child_native_gamepad:
                 self.script_deadline = time.monotonic() + 8
                 GLib.timeout_add(250, self.install_web_script)
             return False

@@ -4,9 +4,18 @@ TV mode is a controller-first launcher for Steam Game Mode. It presents a
 simple service dashboard and forwards controller navigation to browser-based
 streaming services through a private Chrome DevTools connection.
 
+Xbox Cloud is an exception. TV mode releases SDL before Xbox Cloud starts and
+does not install a userscript or translate controller input for that service.
+Chrome receives the physical controller directly.
+
 ## Documentation
 
 - Read [`docs/INSTALL.md`](docs/INSTALL.md) for installation.
+- Read [`docs/STEAMOS.md`](docs/STEAMOS.md) for a clean SteamOS setup.
+- Read [`docs/SERVICE_AUDIT.md`](docs/SERVICE_AUDIT.md) for input and scaling status.
+- Read [`docs/DECKY_PLAN.md`](docs/DECKY_PLAN.md) for the optional Decky plan.
+- Read [`handoff/HANDOFF.md`](handoff/HANDOFF.md) before system migration.
+- Read [`handoff/START_HERE_PL.md`](handoff/START_HERE_PL.md) after reinstalling SteamOS.
 - Read [`docs/README.md`](docs/README.md) for documentation rules.
 
 The project is designed for user-local installation on SteamOS, Bazzite, and
@@ -60,6 +69,7 @@ is expected to be read directly by SDL.
 - `scripts/netflix-focus.js` — Netflix DOM focus and player controls
 - `services.json` — example service selection
 - `install.sh` — repeatable user-local installation
+- `uninstall.sh` — safe removal with optional data purge
 - `steam_shortcut.py` — Steam shortcut registration
 
 The installer and launcher contain no credentials. Authentication happens in

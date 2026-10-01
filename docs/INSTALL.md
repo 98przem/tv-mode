@@ -106,20 +106,29 @@ directly through SDL.
 2. Move left and right on the dashboard.
 3. Press A to start a service.
 4. Press B to return or exit.
-5. Hold View and Menu for about 1.2 seconds to return to the dashboard.
+5. Hold View and Menu for about 1.2 seconds to return from a browser service.
+
+Xbox Cloud uses native controller input. TV mode does not translate Xbox Cloud
+input. Use the Steam menu and Stop Game to return from Xbox Cloud.
 
 ## Remove TV mode
 
-Remove the user-local program and configuration:
+Remove the program and Steam shortcut:
 
 ```bash
-rm -rf ~/.local/share/tv-mode
-rm -rf ~/.config/tv-mode
+~/.local/share/tv-mode/uninstall.sh
 ```
 
-Remove the `TV mode` non-Steam shortcut from Steam.
+The command keeps the configuration and browser login profiles. Use one of
+these commands only when you want to delete more data:
 
-Do not remove browser profiles if you want to keep service login sessions.
+```bash
+./uninstall.sh --purge-config
+./uninstall.sh --purge-profiles
+./uninstall.sh --purge-all
+```
+
+Restart Steam if the shortcut is still visible.
 
 ## Common problems
 
@@ -131,6 +140,10 @@ Restart Steam. The shortcut is stored in the Steam user configuration.
 
 Check that the controller is visible to Steam. Disable Steam Input for the
 TV mode shortcut. Then restart TV mode.
+
+For Xbox Cloud, keep Steam Input disabled. Start Xbox Cloud again after you
+change this setting. TV mode must not install a controller userscript or map
+controller buttons for Xbox Cloud.
 
 ### A browser service does not start
 

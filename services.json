@@ -61,6 +61,7 @@
     "url": "https://www.xbox.com/play",
     "profile": "xbox-cloud",
     "runtime_name": "XboxCloud",
-    "port": 9227
+    "port": 9227,
+    "input": "native_gamepad"
   }
 ]
