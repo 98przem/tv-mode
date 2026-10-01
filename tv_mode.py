@@ -119,6 +119,9 @@ def browser_command(service, profile):
         '--remote-debugging-address=127.0.0.1',
         f"--remote-debugging-port={service['port']}",
         '--remote-allow-origins=http://localhost',
+        '--hide-scrollbars',
+        '--force-dark-mode',
+        '--default-background-color=FF000000',
     ])
     if service.get('host_resolver'):
         resolver = service['host_resolver']
@@ -237,6 +240,7 @@ class ChromeKeyboard:
         self.browser_source = (
             ROOT / 'scripts' / 'browser-focus.js'
         ).read_text()
+        self.netflix_wake_flip = False
 
     def endpoint(self, service, browser=False):
         port = self.ports[service]
@@ -298,6 +302,12 @@ class ChromeKeyboard:
         return True
 
     def click_point(self, websocket, x, y):
+        self.command(websocket, 'Input.dispatchMouseEvent', {
+            'type': 'mouseMoved',
+            'x': float(x),
+            'y': float(y),
+        })
+        time.sleep(0.12)
         for event_type in ('mousePressed', 'mouseReleased'):
             self.command(websocket, 'Input.dispatchMouseEvent', {
                 'type': event_type,
@@ -305,6 +315,42 @@ class ChromeKeyboard:
                 'y': float(y),
                 'button': 'left',
                 'clickCount': 1,
+            })
+        self.command(websocket, 'Input.dispatchMouseEvent', {
+            'type': 'mouseMoved',
+            'x': float(x),
+            'y': float(y),
+        })
+
+    def keep_netflix_controls_awake(self, websocket):
+        result = self.command(websocket, 'Runtime.evaluate', {
+            'expression': """(() => {
+                if (!location.pathname.startsWith('/watch/')) return {x: 1, y: 1};
+                const focused = document.querySelector('[data-tv-mode-focus="true"]');
+                const menu = [...document.querySelectorAll(
+                    '[role="menu"], [role="listbox"], [data-uia^="selector-"], ' +
+                    '[data-uia*="playback-speed"], [data-uia*="speed-selector"], ' +
+                    '.track-list, .audio-subtitle-selector, .episode-selector, ' +
+                    '.playback-speed-selector, .speed-selector'
+                )].find(element => {
+                    const style = getComputedStyle(element);
+                    const box = element.getBoundingClientRect();
+                    return style.display !== 'none' && style.visibility !== 'hidden' && box.width > 8 && box.height > 8;
+                });
+                if (menu && focused && menu.contains(focused)) {
+                    const box = focused.getBoundingClientRect();
+                    return {x: box.left + box.width / 2, y: box.top + box.height / 2};
+                }
+                return {x: innerWidth / 2, y: innerHeight / 2};
+            })()""",
+            'returnByValue': True,
+        })
+        point = result.get('result', {}).get('result', {}).get('value')
+        if point:
+            self.netflix_wake_flip = not self.netflix_wake_flip
+            jitter = 2 if self.netflix_wake_flip else -2
+            self.command(websocket, 'Input.dispatchMouseEvent', {
+                'type': 'mouseMoved', 'x': point['x'] + jitter, 'y': point['y'],
             })
 
     @staticmethod
@@ -337,13 +383,6 @@ class ChromeKeyboard:
                 f'{json.dumps(action)}, {int(held_ms)})'
             )
             with websocket_connect(self.endpoint(service), origin='http://localhost', open_timeout=1, close_timeout=1) as websocket:
-                # Netflix only mounts its native player controls after pointer activity.
-                # Wake that layer before resolving the gamepad focus target.
-                for x, y in ((10, 10), (960, 900)):
-                    self.command(websocket, 'Input.dispatchMouseEvent', {
-                        'type': 'mouseMoved', 'x': x, 'y': y,
-                    })
-                time.sleep(0.08)
                 result = self.command(websocket, 'Runtime.evaluate', {
                     'expression': expression, 'returnByValue': True,
                 })
@@ -360,12 +399,26 @@ class ChromeKeyboard:
                     _, x, y = value.split(':', 2)
                     self.click_point(websocket, x, y)
                     return
+                if isinstance(value, str) and value.startswith('MenuClick:'):
+                    _, x, y = value.split(':', 2)
+                    self.click_point(websocket, x, y)
+                    return
                 if value == 'PlayerBack':
                     self.command(websocket, 'Page.navigate', {
                         'url': 'https://www.netflix.com/browse',
                     })
                     return
+                if value == 'ExitApp':
+                    with websocket_connect(self.endpoint(service, browser=True), origin='http://localhost', open_timeout=1, close_timeout=1) as browser:
+                        self.command(browser, 'Browser.close')
+                    return
                 if value is not True and not isinstance(value, str):
+                    # Netflix mounts its player controls only after pointer activity.
+                    for x, y in ((10, 10), (960, 900)):
+                        self.command(websocket, 'Input.dispatchMouseEvent', {
+                            'type': 'mouseMoved', 'x': x, 'y': y,
+                        })
+                    time.sleep(0.08)
                     self.install_script_on_connection(websocket, self.netflix_source)
                     result = self.command(websocket, 'Runtime.evaluate', {
                         'expression': expression, 'returnByValue': True,
@@ -383,10 +436,18 @@ class ChromeKeyboard:
                         _, x, y = value.split(':', 2)
                         self.click_point(websocket, x, y)
                         return
+                    if isinstance(value, str) and value.startswith('MenuClick:'):
+                        _, x, y = value.split(':', 2)
+                        self.click_point(websocket, x, y)
+                        return
                     if value == 'PlayerBack':
                         self.command(websocket, 'Page.navigate', {
                             'url': 'https://www.netflix.com/browse',
                         })
+                        return
+                    if value == 'ExitApp':
+                        with websocket_connect(self.endpoint(service, browser=True), origin='http://localhost', open_timeout=1, close_timeout=1) as browser:
+                            self.command(browser, 'Browser.close')
                         return
                 if isinstance(value, str):
                     key, code, virtual_key = self.KEYS[value]
@@ -394,6 +455,7 @@ class ChromeKeyboard:
                               'nativeVirtualKeyCode': virtual_key}
                     self.command(websocket, 'Input.dispatchKeyEvent', {'type': 'keyDown', **params})
                     self.command(websocket, 'Input.dispatchKeyEvent', {'type': 'keyUp', **params})
+                self.keep_netflix_controls_awake(websocket)
             if value is not True and not isinstance(value, str):
                 raise RuntimeError('Netflix focus script handled no matching element')
             return
@@ -413,6 +475,10 @@ class ChromeKeyboard:
                         'expression': expression, 'returnByValue': True,
                     })
                     value = result.get('result', {}).get('result', {}).get('value')
+                if value == 'ExitApp':
+                    with websocket_connect(self.endpoint(service, browser=True), origin='http://localhost', open_timeout=1, close_timeout=1) as browser:
+                        self.command(browser, 'Browser.close')
+                    return
                 if value is not True and not isinstance(value, str):
                     raise RuntimeError(f'{service} browser focus script handled no matching element')
                 if isinstance(value, str) and value.startswith('InputFocus:'):
@@ -865,7 +931,7 @@ window.tv-window {
         }[button]
         try:
             self.chrome_keyboard.tap(self.child_name, button, held_ms)
-        except (OSError, RuntimeError, KeyError, TimeoutError) as error:
+        except Exception as error:
             log(f'nie dostarczono {label} do {self.child_name} przez Chrome DevTools: {error}')
             return
         log(f'przekazano {label} do {self.child_name} przez Chrome DevTools')
@@ -978,23 +1044,20 @@ window.tv-window {
         if not self.child or self.child.poll() is not None:
             return
         log(f'zamykanie potomka {self.child_name} przed wyjściem TV mode')
-        if self.child_name in {service.get('runtime_name') for service in self.services if service.get('kind') == 'browser'}:
-            try:
-                self.chrome_keyboard.tap(self.child_name, 'quit')
-            except Exception as error:
-                log(f'grzeczne zamknięcie {self.child_name} nie powiodło się: {type(error).__name__}')
-        try:
-            self.child.wait(timeout=3)
-            log(f'potomek {self.child_name} zakończony poprawnie')
-            return
-        except subprocess.TimeoutExpired:
-            pass
         try:
             os.killpg(self.child.pid, signal.SIGTERM)
-            self.child.wait(timeout=2)
+            self.child.wait(timeout=0.6)
             log(f'potomek {self.child_name} zakończony SIGTERM')
-        except (ProcessLookupError, subprocess.TimeoutExpired):
-            log(f'potomek {self.child_name} nie zakończył się po SIGTERM')
+            return
+        except ProcessLookupError:
+            return
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(self.child.pid, signal.SIGKILL)
+                self.child.wait(timeout=0.4)
+                log(f'potomek {self.child_name} zakończony SIGKILL')
+            except (ProcessLookupError, subprocess.TimeoutExpired):
+                log(f'potomek {self.child_name} nie zakończył się po SIGKILL')
 
 
 if __name__ == '__main__':

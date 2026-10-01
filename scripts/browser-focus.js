@@ -81,6 +81,13 @@
       );
       if (close) { close.click(); return true; }
     }
+    const path = location.pathname.replace(/\/+$/, '') || '/';
+    const host = location.hostname;
+    const onHome =
+      (host === 'tv.apple.com' && ['/', '/watch-now'].includes(path)) ||
+      (host.endsWith('canalplus.com') && /^\/(?:[a-z]{2})?$/.test(path)) ||
+      (host.endsWith('xbox.com') && /^(?:\/[a-z]{2}-[A-Z]{2})?\/play$/.test(path));
+    if (onHome) return 'ExitApp';
     history.back();
     return true;
   };

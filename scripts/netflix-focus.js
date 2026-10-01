@@ -8,25 +8,54 @@
     .button-nfplayerBack, .button-nfplayerFullscreen, .nfplayer-back, .nfplayer-fullscreen,
     [data-uia="control-nav-back"],
     [data-uia="nfplayer-exit"], [data-uia*="fullscreen" i], [aria-label*="fullscreen" i],
-    [aria-label*="full screen" i], [aria-label="Back" i], [aria-label="Wstecz" i] {
+    [aria-label*="full screen" i], [aria-label="Back" i], [aria-label="Wstecz" i],
+    [data-uia*="control-volume" i], [aria-label*="volume" i], [aria-label*="głośno" i],
+    [data-uia*="report" i], [aria-label*="report" i], [aria-label*="zgłoś" i] {
       display: none !important;
     }
     [data-tv-mode-focus="true"] {
-      outline: 2px solid #ffffff !important;
+      outline: 2px solid rgba(235, 235, 235, 0.92) !important;
       outline-offset: 3px !important;
-      box-shadow: 0 0 0 4px rgba(20, 124, 255, 0.75), 0 0 12px rgba(20, 124, 255, 0.9) !important;
+      box-shadow: 0 0 0 3px rgba(125, 125, 125, 0.58), 0 0 10px rgba(0, 0, 0, 0.72) !important;
       border-radius: 6px !important;
     }
     [data-tv-mode-focus="true"][data-uia="timeline-knob"] {
-      outline: 3px solid #ffffff !important;
-      box-shadow: 0 0 0 5px rgba(20, 124, 255, 0.9), 0 0 14px rgba(20, 124, 255, 1) !important;
+      outline: 3px solid rgba(245, 245, 245, 0.95) !important;
+      box-shadow: 0 0 0 4px rgba(125, 125, 125, 0.72), 0 0 12px rgba(0, 0, 0, 0.8) !important;
       border-radius: 50% !important;
+    }
+    html, body { scrollbar-width: none !important; }
+    html::-webkit-scrollbar, body::-webkit-scrollbar { display: none !important; }
+    .watch-video .track-list,
+    .watch-video .audio-subtitle-selector,
+    .watch-video .episode-selector,
+    .watch-video .playback-speed-selector,
+    .watch-video .speed-selector,
+    .watch-video [data-uia*="playback-speed"],
+    .watch-video [data-uia*="speed-selector"] {
+      zoom: 0.82 !important;
+      max-height: 76vh !important;
+    }
+    .watch-video .track-list [data-tv-mode-focus="true"],
+    .watch-video .audio-subtitle-selector [data-tv-mode-focus="true"],
+    .watch-video .episode-selector [data-tv-mode-focus="true"],
+    .watch-video .playback-speed-selector [data-tv-mode-focus="true"],
+    .watch-video .speed-selector [data-tv-mode-focus="true"],
+    .watch-video [data-uia*="episode"] [data-tv-mode-focus="true"],
+    .watch-video [data-uia*="selector"] [data-tv-mode-focus="true"] {
+      outline: none !important;
+      box-shadow: inset 0 0 0 3px rgba(225, 225, 225, 0.9), inset 0 0 0 6px rgba(100, 100, 100, 0.5) !important;
+      border-radius: 5px !important;
     }
   `;
   document.documentElement.append(style);
   let selected = null;
   let playerMode = null;
   let carouselBusyUntil = 0;
+  let detailExpectedUntil = 0;
+  let detailRootElement = null;
+  let seekTarget = null;
+  let seekLastAt = 0;
   const selector = 'button:not([disabled]), [role="button"]:not([aria-disabled="true"]), [role="option"], [role="combobox"], a[href], .sub-menu-link, input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
   const visible = element => {
     const style = getComputedStyle(element), box = element.getBoundingClientRect();
@@ -36,17 +65,49 @@
     const style = getComputedStyle(element), box = element.getBoundingClientRect();
     return style.display !== 'none' && style.visibility !== 'hidden' && box.width > 8 && box.height > 8;
   };
-  const modalRoot = () => [...document.querySelectorAll(
-    '[role="dialog"], [role="alertdialog"], [role="alert"], [aria-modal="true"], [role="menu"], ' +
-    '.previewModal--container, .detail-modal, [data-uia*="modal"], [data-uia*="dialog"], ' +
-    '[data-uia*="interrupter"], [data-uia*="error"], [data-uia*="alert"], [data-uia*="concurrency"], ' +
-    '[data-uia^="selector-"], .track-list, .audio-subtitle-selector, .episode-selector, ' +
-    '.interrupter-actions, .concurrency-interrupter, .nf-modal, .modal-container, .error-container, ' +
-    '.watch-video--playback-error, .playback-error-overlay, [data-uia="playback-error"]'
+  const menuItemSelector = 'button:not([disabled]), a[href], [role="button"], [role="menuitem"], ' +
+    '[role="option"], [role="radio"], [role="tab"], [tabindex]:not([tabindex="-1"]), ' +
+    '[data-uia*="episode-item"], [data-uia*="episode-card"], [data-uia*="episode-row"], ' +
+    '.episode-item, .episode-list-item, .episode-card';
+  const alertRoot = () => [...document.querySelectorAll(
+    '[role="alertdialog"], [role="alert"], [data-uia*="interrupter"], [data-uia*="error"], ' +
+    '[data-uia*="alert"], [data-uia*="concurrency"], .interrupter-actions, ' +
+    '.concurrency-interrupter, .error-container, .watch-video--playback-error, ' +
+    '.playback-error-overlay, [data-uia="playback-error"]'
   )].filter(visible).sort((a, b) => {
     const aa = a.getBoundingClientRect(), bb = b.getBoundingClientRect();
     return bb.width * bb.height - aa.width * aa.height;
   })[0] || null;
+  const playerMenuRoot = () => {
+    if (!inPlayer()) return null;
+    const candidates = [...document.querySelectorAll(
+      '[role="menu"], [role="listbox"], [data-uia^="selector-"], [data-uia*="playback-speed"], ' +
+      '[data-uia*="speed-selector"], [data-uia*="episode-selector"], [data-uia*="episodes"], ' +
+      '.track-list, .audio-subtitle-selector, .episode-selector, ' +
+      '.playback-speed-selector, .speed-selector'
+    )].filter(element => visible(element) && [...element.querySelectorAll(menuItemSelector)].filter(visible).length >= 2);
+    candidates.sort((a, b) => {
+      const aa = a.getBoundingClientRect(), bb = b.getBoundingClientRect();
+      return aa.width * aa.height - bb.width * bb.height;
+    });
+    return candidates[0] || null;
+  };
+  const detailRoot = () => {
+    if (detailRootElement && visible(detailRootElement)) return detailRootElement;
+    detailRootElement = null;
+    if (performance.now() > detailExpectedUntil) return null;
+    const candidates = [...document.querySelectorAll(
+      '[role="dialog"], [aria-modal="true"], .previewModal--container, .detail-modal, ' +
+      '[data-uia*="detail-modal"], [data-uia*="preview-modal"]'
+    )].filter(element => visible(element) && [...element.querySelectorAll(menuItemSelector)].filter(visible).length);
+    candidates.sort((a, b) => {
+      const aa = a.getBoundingClientRect(), bb = b.getBoundingClientRect();
+      return bb.width * bb.height - aa.width * aa.height;
+    });
+    detailRootElement = candidates[0] || null;
+    return detailRootElement;
+  };
+  const modalRoot = () => alertRoot() || playerMenuRoot() || detailRoot();
   const isHero = element => Boolean(
     element && (
       element.matches('[data-uia="play-video-button"], [data-uia="billboard-play-button"], [data-uia*="billboard-play"], [data-uia="billboard-more-info"], [data-uia*="billboard-info"], [data-uia*="billboard"], .billboard-row button, .billboard-row a.playLink') ||
@@ -147,7 +208,7 @@
     selected = element;
     if (!selected) return;
     selected.setAttribute('data-tv-mode-focus', 'true');
-    selected.focus({preventScroll: true});
+    if (selected.matches('input, select, textarea')) selected.focus({preventScroll: true});
     if (isHero(selected)) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       if (document.scrollingElement) {
@@ -265,6 +326,59 @@
     if (selectedIsCard) return scrollCards(sign, origin.x);
     return false;
   }
+  function menuTargets() {
+    const root = modalRoot();
+    if (!root) return [];
+    const items = [...root.querySelectorAll(menuItemSelector)].filter(visible);
+    return items.filter(element => !items.some(other =>
+      other !== element && element.contains(other) && visible(other)
+    ));
+  }
+  function moveMenu(direction) {
+    const items = menuTargets();
+    if (!items.length) return false;
+    if (!selected || !items.includes(selected)) {
+      select(items.find(item =>
+        item.getAttribute('aria-checked') === 'true' || item.getAttribute('aria-selected') === 'true'
+      ) || items[0]);
+      return true;
+    }
+    const from = center(selected.getBoundingClientRect());
+    const vertical = direction === 'ArrowUp' || direction === 'ArrowDown';
+    const sign = direction === 'ArrowLeft' || direction === 'ArrowUp' ? -1 : 1;
+    const candidates = items.map(item => ({item, point: center(item.getBoundingClientRect())}))
+      .filter(candidate => {
+        if (candidate.item === selected) return false;
+        const primary = vertical ? candidate.point.y - from.y : candidate.point.x - from.x;
+        return sign * primary > 4;
+      });
+    candidates.sort((a, b) => {
+      const ap = vertical ? Math.abs(a.point.y - from.y) : Math.abs(a.point.x - from.x);
+      const bp = vertical ? Math.abs(b.point.y - from.y) : Math.abs(b.point.x - from.x);
+      const ac = vertical ? Math.abs(a.point.x - from.x) : Math.abs(a.point.y - from.y);
+      const bc = vertical ? Math.abs(b.point.x - from.x) : Math.abs(b.point.y - from.y);
+      return ap + ac * 0.35 - bp - bc * 0.35;
+    });
+    if (candidates[0]) select(candidates[0].item);
+    return true;
+  }
+  function activateMenu() {
+    const items = menuTargets();
+    if (!selected || !items.includes(selected)) {
+      select(items.find(item =>
+        item.getAttribute('aria-checked') === 'true' || item.getAttribute('aria-selected') === 'true'
+      ) || items[0]);
+      return true;
+    }
+    const box = selected.getBoundingClientRect();
+    return `MenuClick:${box.left + box.width / 2}:${box.top + box.height / 2}`;
+  }
+  function syncPlayerHudFocus() {
+    if (!inPlayer() || playerMenuRoot()) return;
+    const controls = playerControls();
+    if (!controls.length || (selected && controls.includes(selected)) || selected === playerTimeline()) return;
+    select(playerPlayButton() || controls[0]);
+  }
   function advanceCarousel(change, preferredY, nextCard) {
     const row = selected.closest('[data-uia="carousel-scroller"], [data-uia^="carousel-row-section"], .carousel-row, .lolomoRow, .rowContainer, .slider') || document;
     const selector = change > 0
@@ -339,6 +453,13 @@
       }
       return false;
     }
+    const hero = heroTargets();
+    const topActions = topActionTargets();
+    if (hero.length && (!selected || topActions.includes(selected))) {
+      select(hero[0]);
+      hero[0].click();
+      return true;
+    }
     const active = document.activeElement;
     const profileTile = [selected, active].find(element =>
       element?.matches?.('[data-uia^="profile-selector+tile-"]')
@@ -347,7 +468,6 @@
       select(profileTile);
       return 'Space';
     }
-    const topActions = topActionTargets();
     if (selected && topActions.includes(selected)) {
       selected.click();
       return true;
@@ -355,7 +475,19 @@
     const all = targets();
     if (!selected || !all.includes(selected)) select(all[0]);
     if (!selected) return false;
+    const selectedCard = selected.closest(
+      '[data-uia$="-card"], .slider-item, .title-card, .title-card-container, [data-uia*="title-card"]'
+    );
+    if (selectedCard) detailExpectedUntil = performance.now() + 3000;
     selected.click();
+    if (selectedCard) {
+      [250, 500, 900].forEach(delay => setTimeout(() => {
+        const root = detailRoot();
+        if (!root) return;
+        const items = menuTargets();
+        if (items.length && !items.includes(selected)) select(items[0]);
+      }, delay));
+    }
     return true;
   }
   function back() {
@@ -390,6 +522,7 @@
       const element = document.querySelector(candidate);
       if (element && visible(element)) { element.click(); return true; }
     }
+    if (location.pathname === '/browse' || location.pathname === '/browse/') return 'ExitApp';
     return false;
   }
   const playerPlayButton = () => {
@@ -416,7 +549,7 @@
   };
   const playerTimeline = () => {
     const element = document.querySelector(
-      '[data-uia="timeline-knob"], [role="slider"][data-uia*="timeline"], [role="slider"]'
+      '[data-uia="timeline-knob"], [role="slider"][data-uia*="timeline"], [role="slider"][aria-label*="time" i], [role="slider"][aria-label*="postęp" i]'
     );
     return element && visible(element) ? element : null;
   };
@@ -430,32 +563,29 @@
       '[data-uia^="control-play-pause"]',
       '[data-uia="control-back10"]',
       '[data-uia="control-forward10"]',
-      '[data-uia="control-volume-high"]',
-      '[data-uia="control-volume-low"]',
-      '[data-uia="control-volume-muted"]',
       '[data-uia="control-next"]',
       '[data-uia="control-episodes"]',
       '[data-uia="control-audio-subtitle"]',
       '[data-uia="control-speed"]',
     ];
     const explicit = selectors.flatMap(selector => [...document.querySelectorAll(selector)]);
-    const generic = [...document.querySelectorAll(
-      '.watch-video button, .watch-video [role="button"], .PlayerControlsNeo button, .PlayerControlsNeo [role="button"]'
-    )];
-    const controls = [...explicit, ...generic]
+    const controls = explicit
       .map(element => element.closest('button, [role="button"]') || element)
       .filter((element, index, all) => {
         if (!visible(element) || all.indexOf(element) !== index) return false;
         const uia = element.getAttribute('data-uia') || '';
         const label = element.getAttribute('aria-label') || element.textContent || '';
-        return !/nav-back|fullscreen|full screen|player-back|control-back(?!10)|\bback\b|\bwstecz\b/i.test(`${uia} ${label}`);
+        return !/nav-back|fullscreen|full screen|player-back|control-back(?!10)|timeline|scrubber|seek bar|pasek postępu|volume|głośno|report|zgłoś|flag|flaga|\bback\b|\bwstecz\b/i.test(`${uia} ${label}`);
       });
-    return controls;
+    return controls.sort((a, b) => {
+      const aa = a.getBoundingClientRect(), bb = b.getBoundingClientRect();
+      return aa.left - bb.left || aa.top - bb.top;
+    });
   };
   const playerTarget = () => {
     const timeline = playerTimeline();
     const controls = playerControls();
-    if (timeline && (selected === timeline || playerMode === 'timeline')) return timeline;
+    if (timeline && selected === timeline) return timeline;
     if (selected && controls.includes(selected)) return selected;
     const play = playerPlayButton();
     return play || controls[0] || timeline;
@@ -468,6 +598,7 @@
     if (direction === 'ArrowUp') {
       if (current !== timeline && timeline) {
         playerMode = 'timeline';
+        seekTarget = null;
         select(timeline);
         return true;
       }
@@ -481,6 +612,7 @@
     if (direction === 'ArrowDown') {
       if (current === timeline) {
         playerMode = 'controls';
+        seekTarget = null;
         select(playerPlayButton() || controls[0]);
         return true;
       }
@@ -522,6 +654,14 @@
     try {
       current.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
     } catch (_) {}
+    [120, 250, 500, 900].forEach(delay => setTimeout(() => {
+      const items = menuTargets();
+      if (items.length && !items.includes(selected)) {
+        select(items.find(item =>
+          item.getAttribute('aria-checked') === 'true' || item.getAttribute('aria-selected') === 'true'
+        ) || items[0]);
+      }
+    }, delay));
     return true;
   }
   function seekPlayer(direction, heldMs = 0) {
@@ -533,9 +673,13 @@
     const video = document.querySelector('video');
     if (!timeline || !track || !video || !Number.isFinite(video.duration) || video.duration <= 0) return result;
     const box = track.getBoundingClientRect();
-    const step = heldMs >= 2500 ? 15 : heldMs >= 1200 ? 10 : 5;
+    const step = heldMs >= 4000 ? 120 : heldMs >= 2500 ? 60 : heldMs >= 1200 ? 20 : 5;
     const change = result === 'TimelineLeft' ? -step : step;
-    const target = Math.max(0, Math.min(video.duration, video.currentTime + change));
+    const now = performance.now();
+    if (seekTarget === null || now - seekLastAt > 900) seekTarget = video.currentTime;
+    seekTarget = Math.max(0, Math.min(video.duration, seekTarget + change));
+    seekLastAt = now;
+    const target = seekTarget;
     return `TimelineClick:${box.left + box.width * target / video.duration}:${box.top + box.height / 2}`;
   }
   const direction = {up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight'};
@@ -543,8 +687,8 @@
     handle(action, heldMs = 0) {
       const modal = modalRoot();
       if (modal) {
-        if (direction[action]) return move(direction[action], heldMs);
-        if (action === 'a') return activate();
+        if (direction[action]) return moveMenu(direction[action]);
+        if (action === 'a') return activateMenu();
         if (action === 'b') return back();
         return false;
       }
@@ -565,4 +709,5 @@
       return false;
     },
   };
+  setInterval(syncPlayerHudFocus, 250);
 })();
